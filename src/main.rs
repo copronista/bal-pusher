@@ -99,7 +99,7 @@ fn main_result() -> Result<(), Error> {
  
 
 
-    let db = sqlite::open("../prova.db").unwrap();
+    let db = sqlite::open("../bal.db").unwrap();
     dbg!(&network_params.db_field);
     let query_tx = db.prepare("SELECT  * FROM tbl_tx WHERE network = :network AND status = :status AND ( locktime < :bestblock_height  OR locktime > :locktime_threshold AND locktime < :bestblock_time);").unwrap().into_iter();
     //let query_tx = db.prepare("SELECT * FROM tbl_tx where status = :status").unwrap().into_iter();
