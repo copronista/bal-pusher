@@ -17,9 +17,36 @@ use bitcoin::Network;
 use bitcoincore_rpc::{bitcoin, Auth, Client, Error, RpcApi};
 
 use sqlite::{Value};
-
+use std::sync::Arc;
+use serde::Serialize;
+use serde::Deserialize;
 use std::env;
+
 const LOCKTIME_THRESHOLD:i32 = 500000000;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct MyConfig {
+    address: String,
+    fixed_fee: u64,
+    bind: String,
+    bind_port: u16,
+    requests_file: String,
+    db_file: String
+
+}
+impl Default for MyConfig {
+    fn default() -> Self {
+        MyConfig {
+            address: "Unknown".to_string(),
+            fixed_fee: 10000,
+            bind:"127.0.0.1".to_string(),
+            bind_port:9137,
+            requests_file:"rawrequests.log".to_string(),
+            db_file: "../bal.db".to_string()
+        }
+    }
+}
+
 struct NetworkParams {
     host:           String,
     port:           u16,
@@ -99,7 +126,17 @@ fn main_result() -> Result<(), Error> {
  
 
 
-    let db = sqlite::open("../bal.db").unwrap();
+    //let db = match sqlite::open("../prova.db"){
+    //    Ok(db) => {println!("OK DB CONNECTED"); db;}
+    //    Err(err) => {println!("error: {}",err); {}}
+    //};
+    //
+    let cfg: Arc<MyConfig> = Arc::new(confy::load("bal-server",None).expect("cant_load"));
+    let file = confy::get_configuration_file_path("bal-server",None).expect("Error while getting path");
+    println!("The configuration file path is: {:#?}", file);
+    let db = sqlite::open(&cfg.db_file).unwrap();
+
+    //let db = sqlite::open("../prova.db").unwrap();
     dbg!(&network_params.db_field);
     let query_tx = db.prepare("SELECT  * FROM tbl_tx WHERE network = :network AND status = :status AND ( locktime < :bestblock_height  OR locktime > :locktime_threshold AND locktime < :bestblock_time);").unwrap().into_iter();
     //let query_tx = db.prepare("SELECT * FROM tbl_tx where status = :status").unwrap().into_iter();
@@ -147,3 +184,4 @@ fn main_result() -> Result<(), Error> {
 fn main() {
     main_result().unwrap();
 }
+
