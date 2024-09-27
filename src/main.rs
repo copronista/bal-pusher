@@ -101,11 +101,11 @@ fn main_result() -> Result<(), Error> {
                 let cookie_file_path = format!("{}/.bitcoin/{}.cookie",home_str, network_params.dir_path);
                 dbg!(&cookie_file_path);
                 Client::new(&url[..], Auth::CookieFile(cookie_file_path.into())).unwrap()
-            }else{ panic!()}
+            }else{ panic!("diocane")}
         }
         None => Client::new(&url[..], Auth::UserPass(rpc_user, rpc_pass)).unwrap() 
     };
-
+    dbg!(&rpc)
     let _blockchain_info = rpc.get_blockchain_info()?;
 
     let best_block_hash = rpc.get_best_block_hash()?;
@@ -131,11 +131,12 @@ fn main_result() -> Result<(), Error> {
     //    Err(err) => {println!("error: {}",err); {}}
     //};
     //
+// To the extent possible under law, the author(s) have dedicated all
     let cfg: Arc<MyConfig> = Arc::new(confy::load("bal-server",None).expect("cant_load"));
     let file = confy::get_configuration_file_path("bal-server",None).expect("Error while getting path");
     println!("The configuration file path is: {:#?}", file);
     let db = sqlite::open(&cfg.db_file).unwrap();
-
+    
     //let db = sqlite::open("../prova.db").unwrap();
     dbg!(&network_params.db_field);
     let query_tx = db.prepare("SELECT  * FROM tbl_tx WHERE network = :network AND status = :status AND ( locktime < :bestblock_height  OR locktime > :locktime_threshold AND locktime < :bestblock_time);").unwrap().into_iter();
