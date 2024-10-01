@@ -103,11 +103,15 @@ fn main_result() -> Result<(), Error> {
                 Client::new(&url[..], Auth::CookieFile(cookie_file_path.into())).unwrap()
             }else{ panic!("diocane")}
         }
-        None => Client::new(&url[..], Auth::UserPass(rpc_user, rpc_pass)).unwrap() 
+        None => {
+            println!("{}","home is none");
+            Client::new(&url[..], Auth::UserPass(rpc_user, rpc_pass)).unwrap() 
+        }
     };
-    dbg!(&rpc)
+    dbg!(&network);
+    dbg!(&rpc);
     let _blockchain_info = rpc.get_blockchain_info()?;
-
+    dbg!(&_blockchain_info);
     let best_block_hash = rpc.get_best_block_hash()?;
     println!("best block hash: {}", best_block_hash);
     let bestblockcount = rpc.get_block_count()?;
