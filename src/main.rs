@@ -21,6 +21,8 @@ use std::sync::Arc;
 use serde::Serialize;
 use serde::Deserialize;
 use std::env;
+use std::fs::OpenOptions;
+use std::io::{ Write};
 
 const LOCKTIME_THRESHOLD:i32 = 500000000;
 
@@ -108,10 +110,7 @@ fn main_result() -> Result<(), Error> {
             Client::new(&url[..], Auth::UserPass(rpc_user, rpc_pass)).unwrap() 
         }
     };
-    dbg!(&network);
-    dbg!(&rpc);
     let _blockchain_info = rpc.get_blockchain_info()?;
-    dbg!(&_blockchain_info);
     let best_block_hash = rpc.get_best_block_hash()?;
     println!("best block hash: {}", best_block_hash);
     let bestblockcount = rpc.get_block_count()?;
@@ -150,7 +149,6 @@ fn main_result() -> Result<(), Error> {
     dbg!(LOCKTIME_THRESHOLD);
     dbg!(bitcoin_block.header.time);
     dbg!(bestblockcount);
-    dbg!(&network_params.db_field);
     for row in query_tx.bind::<&[(_, Value)]>(&[
         (":locktime_threshold", (LOCKTIME_THRESHOLD as i64).into()),
         (":bestblock_time", (bitcoin_block.header.time as i64).into()),
@@ -163,13 +161,29 @@ fn main_result() -> Result<(), Error> {
     {
         let tx = row.read::<&str, _>("tx");
         let txid = row.read::<&str, _>("txid");
+        let locktime = row.read::<i64,_>("locktime");
         println!("to be pushed{}",txid);
         match rpc.send_raw_transaction(tx){
             Ok(o) => {
+                let mut file = OpenOptions::new()
+                    .append(true) // Set the append option
+                    .create(true) // Create the file if it doesn't exist
+                    .open("valid_txs")?;
+                let data = format!("{}\n",txid);
+                file.write_all(data.as_bytes())?;
+                drop(file);
+
                 println!("tx: {} pusshata PUSHED\n{}",txid,o);
                 pushed_txs.push(txid.to_string());
             },
             Err(err) => {
+                let mut file = OpenOptions::new()
+                    .append(true) // Set the append option
+                    .create(true) // Create the file if it doesn't exist
+                    .open("invalid_txs")?;
+                let data = format!("{}:\t{}\t:\t{}\t:\t{}\n",txid,err,bitcoin_block.header.time,locktime);
+                file.write_all(data.as_bytes())?;
+                drop(file);
                 println!("Error: {}\n{}",err,txid);
                 invalid_txs.push(txid.to_string());
             },
@@ -180,7 +194,7 @@ fn main_result() -> Result<(), Error> {
         let _ = db.execute(format!("UPDATE tbl_tx SET status = 1 WHERE txid in ('{}');",pushed_txs.join("','")));
     }
     if invalid_txs.len() > 0 {
-        let _ = db.execute(format!("UPDATE tbl_tx SET status = 2 WHERE txid in ('{}');",invalid_txs.join("','")));
+        //let _ = db.execute(format!("UPDATE tbl_tx SET status = 2 WHERE txid in ('{}');",invalid_txs.join("','")));
     }
     
     Ok(())
