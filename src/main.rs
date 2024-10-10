@@ -169,7 +169,7 @@ fn main_result() -> Result<(), Error> {
                     .append(true) // Set the append option
                     .create(true) // Create the file if it doesn't exist
                     .open("valid_txs")?;
-                let data = format!("{}\n",txid);
+                let data = format!("{}\t:\t{}\t:\t{}\n",txid,bitcoin_block.header.time,locktime);
                 file.write_all(data.as_bytes())?;
                 drop(file);
 
