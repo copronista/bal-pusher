@@ -162,7 +162,7 @@ fn main_result() -> Result<(), Error> {
         let tx = row.read::<&str, _>("tx");
         let txid = row.read::<&str, _>("txid");
         let locktime = row.read::<i64,_>("locktime");
-        println!("to be pushed: {}",txid, locktime);
+        println!("to be pushed: {}: {}",txid, locktime);
         match rpc.send_raw_transaction(tx){
             Ok(o) => {
                 let mut file = OpenOptions::new()
