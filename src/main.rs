@@ -92,7 +92,17 @@ fn main_result() -> Result<(), Error> {
     let user = args.next().expect("no user given");
     let pass = args.next().expect("no pass given");
     */
-    let network = Network::Regtest;
+    //let network = Network::Regtest
+    let arg_network = args.next().unwrap();
+
+    let network = match arg_network.as_str(){
+        "testnet" => Network::Testnet,
+        "signet" => Network::Signet,
+        "regtest" => Network::Regtest,
+        _ => Network::Bitcoin,
+    };
+
+    println!("{}",arg_network);
     let network_params = get_network_params(network);
     let rpc_user = "rpc_user".to_string();
     let rpc_pass = "rpc_pass".to_string();
@@ -102,7 +112,12 @@ fn main_result() -> Result<(), Error> {
             if let Some(home_str) = home.to_str(){
                 let cookie_file_path = format!("{}/.bitcoin/{}.cookie",home_str, network_params.dir_path);
                 dbg!(&cookie_file_path);
-                Client::new(&url[..], Auth::CookieFile(cookie_file_path.into())).unwrap()
+                match Client::new(&url[..], Auth::CookieFile(cookie_file_path.into())) {
+                    Ok(client) => client,
+                    Err(_) => {
+                        panic!("Failed to create client: diocanemaiale");
+                    }
+                }
             }else{ panic!("diocane")}
         }
         None => {
@@ -121,6 +136,7 @@ fn main_result() -> Result<(), Error> {
 
     let bitcoin_block: bitcoin::Block = rpc.get_by_id(&best_block_hash)?;
     println!("best block hash by `get`: {}", bitcoin_block.header.prev_blockhash);
+    dbg!(&bitcoin_block);
     match rpc.get_by_id::<bitcoin::Transaction>(&bitcoin_block.txdata[0].txid()){
         Ok(bitcoin_tx) => {println!("tx by `get`: {}", bitcoin_tx.txid());}
         Err(_) => {}
