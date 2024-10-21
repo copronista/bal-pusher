@@ -66,7 +66,7 @@ fn get_network_params(network:Network) -> NetworkParams{
         Network::Testnet    =>  NetworkParams{
             host:           "http://localhost".to_string(),
             port:           18333,
-            dir_path:       "testnet/".to_string(),
+            dir_path:       "testnet3/".to_string(),
             db_field:        "testnet".to_string(),
         },
         Network::Signet     =>  NetworkParams{
