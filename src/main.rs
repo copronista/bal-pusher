@@ -66,13 +66,13 @@ fn get_network_params(network:Network) -> NetworkParams{
     match network {
         Network::Testnet    =>  NetworkParams{
             host:           "http://localhost".to_string(),
-            port:           18333,
+            port:           18332,
             dir_path:       "testnet3/".to_string(),
             db_field:        "testnet".to_string(),
         },
         Network::Signet     =>  NetworkParams{
             host:           "http://localhost".to_string(),
-            port:           18333,
+            port:           18332,
             dir_path:       "signet/".to_string(),
             db_field:        "signet".to_string(),
         },
@@ -84,7 +84,7 @@ fn get_network_params(network:Network) -> NetworkParams{
         },
         _                   =>  NetworkParams{
             host:           "http://localhost".to_string(),
-            port:           8333,
+            port:           8332,
             dir_path:       "".to_string(),
             db_field:       "mainnet".to_string(),
         },
@@ -108,10 +108,11 @@ fn get_client(cfg: &MyConfig,network_params:&NetworkParams) -> Result<Client,Err
                             Some(home_str) => {
                                 let cookie_file_path = format!("{}/.bitcoin/{}.cookie",home_str, network_params.dir_path);
                                 dbg!(&cookie_file_path);
+                                dbg!(&url);
                                 match Client::new(&url[..], Auth::CookieFile(cookie_file_path.into())) {
                                     Ok(client) =>match client.get_best_block_hash(){
                                         Ok(best_hash) =>{
-                                            info!("connected using rpcuserpass: {}",best_hash);
+                                            info!("connected using cookies: {}",best_hash);
                                             client
                                         }
                                         Err(err) => {
