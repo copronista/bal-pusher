@@ -147,7 +147,7 @@ fn main_result() -> Result<(), Error> {
     //let network = Network::Regtest
     let file = confy::get_configuration_file_path("bal-pusher",None).expect("Error while getting path");
     println!("The configuration file path is: {:#?}", file);
-    let cfg: MyConfig = confy::load("bal-server",None).expect("cant load config file");
+    let cfg: MyConfig = confy::load("bal-pusher",None).expect("cant load config file");
     let arg_network = match args.next(){
         Some(nargs) => nargs,
         None => "main".to_string()
