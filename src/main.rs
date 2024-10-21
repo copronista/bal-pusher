@@ -17,7 +17,6 @@ use bitcoin::Network;
 use bitcoincore_rpc::{bitcoin, Auth, Client, Error, RpcApi};
 
 use sqlite::{Value};
-use std::sync::Arc;
 use serde::Serialize;
 use serde::Deserialize;
 use std::env;
@@ -146,10 +145,9 @@ fn main_result() -> Result<(), Error> {
     let pass = args.next().expect("no pass given");
     */
     //let network = Network::Regtest
-    let file = confy::get_configuration_file_path("bal-server",None).expect("Error while getting path");
+    let file = confy::get_configuration_file_path("bal-pusher",None).expect("Error while getting path");
     println!("The configuration file path is: {:#?}", file);
-    let cfg: MyConfig = confy::load("bal-server",None).expect("cant_load");
-
+    let cfg: MyConfig = confy::load("bal-server",None).expect("cant load config file");
     let arg_network = match args.next(){
         Some(nargs) => nargs,
         None => "main".to_string()
@@ -164,11 +162,8 @@ fn main_result() -> Result<(), Error> {
 
     println!("{}",arg_network);
     let network_params = get_network_params(network);
-    //let rpc_user = 
-    //let rpc_pass = "rpc_pass".to_string();
     println!("rpc_user: {}",cfg.rpc_user.to_string());
     println!("rpc_pass: {}",cfg.rpc_pass.to_string());
-    let url = format!("{}:{}",network_params.host,network_params.port);
 
     match get_client(&cfg,&network_params){
         Ok(rpc) => {
@@ -179,6 +174,18 @@ fn main_result() -> Result<(), Error> {
             let bestblockcount = rpc.get_block_count()?;
             println!("best block height: {}", bestblockcount);
             let best_block_hash_by_height = rpc.get_block_hash(bestblockcount)?;
+            let from_block= std::cmp::max(0, bestblockcount - 11);
+            let mut time_sum:u64=0;
+            for i in from_block..bestblockcount{
+                let hash = rpc.get_block_hash(i).unwrap();
+                let block: bitcoin::Block = rpc.get_by_id(&hash).unwrap();
+                //println!("block time: {}", block.header.time);
+                time_sum += <u32 as Into<u64>>::into(block.header.time);
+                //println!("time_sum:{}",time_sum)
+            }
+            let average_time = time_sum/11;
+            println!("average time: {}",average_time);
+
             println!("best block hash by height: {}", best_block_hash_by_height);
             assert_eq!(best_block_hash_by_height, best_block_hash);
 
@@ -210,7 +217,7 @@ fn main_result() -> Result<(), Error> {
             dbg!(bestblockcount);
             for row in query_tx.bind::<&[(_, Value)]>(&[
                 (":locktime_threshold", (LOCKTIME_THRESHOLD as i64).into()),
-                (":bestblock_time", (bitcoin_block.header.time as i64).into()),
+                (":bestblock_time", (average_time as i64).into()),
                 (":bestblock_height", (bestblockcount as i64).into()),
                 (":network", network_params.db_field.into()),
                 (":status", 0.into()),
@@ -253,7 +260,7 @@ fn main_result() -> Result<(), Error> {
                 let _ = db.execute(format!("UPDATE tbl_tx SET status = 1 WHERE txid in ('{}');",pushed_txs.join("','")));
             }
             if invalid_txs.len() > 0 {
-                //let _ = db.execute(format!("UPDATE tbl_tx SET status = 2 WHERE txid in ('{}');",invalid_txs.join("','")));
+                let _ = db.execute(format!("UPDATE tbl_tx SET status = 2 WHERE txid in ('{}');",invalid_txs.join("','")));
             }
         }
         Err(_)=>{
