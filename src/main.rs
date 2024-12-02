@@ -86,7 +86,7 @@ fn get_network_params(network:Network) -> NetworkParams{
             host:           "http://localhost".to_string(),
             port:           8332,
             dir_path:       "".to_string(),
-            db_field:       "mainnet".to_string(),
+            db_field:       "bitcoin".to_string(),
         },
     }
 }
@@ -100,7 +100,7 @@ fn get_client(cfg: &MyConfig,network_params:&NetworkParams) -> Result<Client,Err
             }
             Err(err) => {
                 dbg!(err);
-                warn!("cant connect using username: {} and password: {}",cfg.rpc_user,cfg.rpc_pass);
+                debug!("cant connect using username: {} and password: {}",cfg.rpc_user,cfg.rpc_pass);
                 match env::var_os("HOME") {
                     Some(home) => {
                         info!("some home {}",home.to_str().unwrap());
