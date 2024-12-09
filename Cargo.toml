@@ -11,3 +11,7 @@ bitcoincore-rpc = "0.19.0"
 sqlite = "0.34.0"
 confy = "0.6.1"
 serde = { version = "1.0.152", features = ["derive"] } # <- Only one serde version needed (serde or serde_derive) 
+zmq = "0.10.0"
+hex = "0.4.3"
+byteorder = "1.5.0"
+
