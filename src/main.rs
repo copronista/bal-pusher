@@ -1,20 +1,9 @@
-// To the extent possible under law, the author(s) have dedicated all
-// copyright and related and neighboring rights to this software to
-// the public domain worldwide. This software is distributed without
-// any warranty.
-//
-// You should have received a copy of the CC0 Public Domain Dedication
-// along with this software.
-// If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
-//
-
-//! A very simple example used as a self-test of this library against a Bitcoin
-//! Core node.
 extern crate bitcoincore_rpc;
 extern crate zmq;
 use bitcoin::Network;
 
 use bitcoincore_rpc::{bitcoin, Auth, Client, Error, RpcApi};
+use bitcoincore_rpc_json::GetBlockchainInfoResult;
 
 use sqlite::{Value};
 use serde::Serialize;
@@ -22,7 +11,7 @@ use serde::Deserialize;
 use std::env;
 use std::fs::OpenOptions;
 use std::io::{ Write};
-use log::{info,debug,warn};
+use log::{info,debug,warn,error};
 use zmq::{Context, Socket};
 use std::str;
 use std::{thread, time::Duration};
@@ -136,11 +125,11 @@ fn get_cookie_filename(network: &NetworkParams) ->Result<String,Box<dyn StdError
         }
     }
 }
-fn get_client_from_username(url: &String, network: &NetworkParams) -> Result<Client,Box<dyn StdError>>{
+fn get_client_from_username(url: &String, network: &NetworkParams) -> Result<(Client,GetBlockchainInfoResult),Box<dyn StdError>>{
     if network.rpc_user != "" {
         match Client::new(&url[..],Auth::UserPass(network.rpc_user.to_string(),network.rpc_pass.to_string())){
-            Ok(client) => match client.get_best_block_hash(){
-                Ok(_) => Ok(client),
+            Ok(client) => match client.get_blockchain_info(){
+                Ok(bcinfo) => Ok((client,bcinfo)),
                 Err(err) => Err(err.into())
              }
             Err(err)=>Err(err.into())
@@ -149,12 +138,12 @@ fn get_client_from_username(url: &String, network: &NetworkParams) -> Result<Cli
         Err("Failed".into())
     }
 }
-fn get_client_from_cookie(url: &String,network: &NetworkParams)->Result<Client,Box<dyn StdError>>{
+fn get_client_from_cookie(url: &String,network: &NetworkParams)->Result<(Client,GetBlockchainInfoResult),Box<dyn StdError>>{
     match get_cookie_filename(network){
         Ok(cookie) => {
             match Client::new(&url[..], Auth::CookieFile(cookie.into())) {
-                Ok(client) => match client.get_best_block_hash(){
-                    Ok(_) => Ok(client),
+                Ok(client) => match client.get_blockchain_info(){
+                    Ok(bcinfo) => Ok((client,bcinfo)),
                     Err(err) => Err(err.into())
                 },
                 Err(err)=>Err(err.into())
@@ -164,7 +153,7 @@ fn get_client_from_cookie(url: &String,network: &NetworkParams)->Result<Client,B
         Err(err)=>Err(err.into())
     }
 }
-fn get_client(network: &NetworkParams) -> Result<Client,Box<dyn StdError>>{
+fn get_client(network: &NetworkParams) -> Result<(Client,GetBlockchainInfoResult),Box<dyn StdError>>{
     let url = format!("{}:{}",network.host,&network.port);
     match get_client_from_username(&url,network){
         Ok(client) =>{Ok(client)},
@@ -187,26 +176,25 @@ fn main_result(cfg: &MyConfig, network_params: &NetworkParams) -> Result<(), Err
     */
     //let network = Network::Regtest
     match get_client(network_params){
-        Ok(rpc) => {
+        Ok((rpc,bcinfo)) => {
             info!("connected");
-            let _blockchain_info = rpc.get_blockchain_info()?;
-            let best_block_hash = rpc.get_best_block_hash()?;
-            info!("best block hash: {}", best_block_hash);
-            let bestblockcount = rpc.get_block_count()?;
-            info!("best block height: {}", bestblockcount);
-            let best_block_hash_by_height = rpc.get_block_hash(bestblockcount)?;
-            info!("best block hash by height: {}", best_block_hash_by_height);
-            assert_eq!(best_block_hash_by_height, best_block_hash);
-            let from_block= std::cmp::max(0, bestblockcount - 11);
-            let mut time_sum:u64=0;
-            for i in from_block..bestblockcount{
-                let hash = rpc.get_block_hash(i).unwrap();
-                let block: bitcoin::Block = rpc.get_by_id(&hash).unwrap();
-                time_sum += <u32 as Into<u64>>::into(block.header.time);
-            }
-            let average_time = time_sum/11;
-            info!("average time: {}",average_time);
-
+            //let best_block_hash = rpc.get_best_block_hash()?;
+            //info!("best block hash: {}", best_block_hash);
+            //let bestblockcount = rpc.get_block_count()?;
+            //info!("best block height: {}", bestblockcount);
+            //let best_block_hash_by_height = rpc.get_block_hash(bestblockcount)?;
+            //info!("best block hash by height: {}", best_block_hash_by_height);
+            //assert_eq!(best_block_hash_by_height, best_block_hash);
+            //let from_block= std::cmp::max(0, bestblockcount - 11);
+            //let mut time_sum:u64=0;
+            //for i in from_block..bestblockcount{
+            //    let hash = rpc.get_block_hash(i).unwrap();
+            //    let block: bitcoin::Block = rpc.get_by_id(&hash).unwrap();
+            //    time_sum += <u32 as Into<u64>>::into(block.header.time);
+            //}
+            //let average_time = time_sum/11;
+            info!("median time: {}",bcinfo.median_time);
+            let average_time = bcinfo.median_time;
             let db = sqlite::open(&cfg.db_file).unwrap();
             
             let query_tx = db.prepare("SELECT  * FROM tbl_tx WHERE network = :network AND status = :status AND ( locktime < :bestblock_height  OR locktime > :locktime_threshold AND locktime < :bestblock_time);").unwrap().into_iter();
@@ -216,7 +204,7 @@ fn main_result(cfg: &MyConfig, network_params: &NetworkParams) -> Result<(), Err
             for row in query_tx.bind::<&[(_, Value)]>(&[
                 (":locktime_threshold", (LOCKTIME_THRESHOLD as i64).into()),
                 (":bestblock_time", (average_time as i64).into()),
-                (":bestblock_height", (bestblockcount as i64).into()),
+                (":bestblock_height", (bcinfo.blocks as i64).into()),
                 (":network", network_params.db_field.clone().into()),
                 (":status", 0.into()),
                 ][..])
@@ -293,7 +281,7 @@ fn parse_env(cfg: &Mutex<MyConfig>){
     cfg_lock = parse_env_netconfig(cfg_lock,"regtest");
     cfg_lock = parse_env_netconfig(cfg_lock,"signet");
     cfg_lock = parse_env_netconfig(cfg_lock,"testnet");
-    drop(parse_env_netconfig(cfg_lock,"mainnet"));
+    drop(parse_env_netconfig(cfg_lock,"bitcoin"));
 
 }
 
@@ -340,12 +328,34 @@ fn parse_env_netconfig<'a>(mut cfg_lock: MutexGuard<'a, MyConfig>, chain: &'a st
     cfg_lock
 }
 
+fn get_default_config()-> MyConfig {
+    let file = confy::get_configuration_file_path("bal-pusher",None).expect("Error while getting path");
+    info!("Default configuration file path is: {:#?}", file);
+    confy::load("bal-pusher",None).expect("cant_load")
+}
+
 fn main(){
     env_logger::init();
+    let cfg: Mutex<MyConfig> = match env::var("BAL_PUSHER_CONFIG_FILE") {
+        Ok(value) => {
+            Mutex::new(
+                match confy::load_path(value.to_string()){
+                    Ok(val) => {
+                        info!("The configuration file path is: {:#?}", value);
+                        val
+                    },
+                    Err(err) => {
+                        error!("{}",err);
+                        get_default_config()
+                    }
+                }
+            )
+        },
+        Err(_) => {
+            Mutex::new(get_default_config())
+        },
+    };
 
-    let file = confy::get_configuration_file_path("bal-pusher",None).expect("Error while getting path");
-    info!("The configuration file path is: {:#?}", file);
-    let cfg: Mutex<MyConfig> = Mutex::new(confy::load("bal-pusher",None).expect("cant load config file"));
     parse_env(&cfg);
     let mut args = std::env::args();
     let _exe_name = args.next().unwrap();
@@ -375,18 +385,21 @@ fn main(){
 
     // Sottoscriviamo a tutti i messaggi
     socket.set_subscribe(b"").unwrap(); // b"" per ricevere tutti i messaggi
-    {
-        let cfg = cfg_lock.clone();
-        let _ = main_result(&cfg,&network_params);
-    }
-    info!("In attesa di nuovi blocchi...");
 
+    let cfg = cfg_lock.clone();
+    let _ = main_result(&cfg,&network_params);
+    info!("In attesa di nuovi blocchi...");
+    let mut last_seq:Vec<u8>=[0;4].to_vec();
     loop {
         // Ricevi il messaggio
         let message = socket.recv_multipart(0).unwrap();
         let topic = message[0].clone();
         let body = message[1].clone();
-        //let seq = message[2].clone();
+        let seq = message[2].clone();
+        if last_seq >= seq {
+            continue
+        }
+        last_seq = seq;
         //let mut sequence_str = "Unknown".to_string();
         /*if seq.len()==4{
             let mut rdr = Cursor::new(seq);
